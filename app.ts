@@ -17,8 +17,28 @@ export class Program {
         const server = express();
         this.server = server;
         server.use(bodyParser.json());
+        
+        // CORS
+        server.all('*', function (req, res, next) {
+            res.header('Access-Control-Allow-Origin', "*");
+            res.header('Access-Control-Allow-Methods', 'OPTIONS, POST, GET, PUT, DELETE');
+            res.header('Access-Control-Allow-Credentials', 'true');
+            res.header('Access-Control-Max-Age', '86400');
+            res.header('Access-Control-Allow-Headers', 'X-Requested-With, X-HTTP-Method-Override, ' +
+                'Content-Type, Accept, Authentication, Authorization, X-Consumer-Username, sess, apikey, clientid');
 
-        APIInfo.Logging = ENV.LOGGING == true;
+            if (req.method.toUpperCase() == 'OPTIONS') {
+                res.statusCode = 204;
+                res.send();
+                return;
+            }
+
+            next();
+        });
+
+        server.use('/hls', express.static(`${ENV.FILE_UPLOAD_DIR}/output`))
+
+        APIInfo.Logging = false;
         await ExpressRouter.loadDir(server, `${__dirname}/routes`);
         
         ExpressRouter.ResponseHandler = this.expressRouterResponse.bind(this)
@@ -28,9 +48,7 @@ export class Program {
     public static async main() {
         await this.setUp();
         await new Promise(res => this.server.listen(ENV.HTTP_PORT, () => {
-            if (ENV.LOGGING !== false) {
-                console.log(`Listen on port ${ENV.HTTP_PORT}...`);
-            }
+            console.log(`Listen on port ${ENV.HTTP_PORT}...`);
             res();
         }));
         

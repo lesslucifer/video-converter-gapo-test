@@ -4,21 +4,13 @@ import _ from 'lodash';
 
 const ajv = newAjv2();
 
-
-const ajvAmqpConfig = {
-    '+@connection': 'string',
-    'options': {}
-}
-interface ENV_AMQP_CONFIG {
-    connection: string;
-    options: any;
-}
-
 const ajvConnConfig = {
-    '@AMQP': ajvAmqpConfig
+    'REDIS': {},
+    'RSMQ': {}
 };
 export interface ENV_CONN_CONFIG {
-    AMQP?: ENV_AMQP_CONFIG
+    REDIS?: any;
+    RSMQ?: any;
 }
 
 const ajvWorkerConfig = {
@@ -30,11 +22,21 @@ export interface ENV_WORKER_CONFIG {
     options?: any;
 }
 
+const ajvProcessConfig = {
+    '@worker': 'boolean',
+    '@http': 'boolean'
+}
+interface ENV_PROCESS_CONFIG {
+    worker: boolean;
+    http: boolean;
+}
+
 const ajvEnvConfig = ajv({
     '@NAME': 'string',
     '@HTTP_PORT': 'integer|>0',
     '+@CONN': ajvConnConfig,
     '@WORKER': ajvWorkerConfig,
+    '+@PROCESS': ajvProcessConfig,
     '+@FILE_UPLOAD_DIR': 'string'
 });
 export interface ENV_CONFIG {
@@ -43,6 +45,7 @@ export interface ENV_CONFIG {
     
     CONN: ENV_CONN_CONFIG;
     WORKER?: ENV_WORKER_CONFIG;
+    PROCESS: ENV_PROCESS_CONFIG;
 
     FILE_UPLOAD_DIR: string;
 }

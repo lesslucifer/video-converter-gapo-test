@@ -4,7 +4,8 @@ import multer = require("multer");
 import ENV from "../glob/env";
 import uuid = require("uuid");
 import { AppLogicError } from "../utils/hera";
-import { FFMPEGVideoConvertHandler } from "../serv/workers/handlers/video_convert_480p_60pfs_hlsh264";
+import { FFMPEGVideoConvertHandler } from "../serv/workers/handlers/ffmpeg_video_convert_handler";
+import WorkerServ from "../serv/workers";
 
 
 export class VideoRouter extends ExpressRouter {
@@ -31,15 +32,16 @@ export class VideoRouter extends ExpressRouter {
     async uploadNewVideo(@Req('file') file: any) {
         if (!file) throw new AppLogicError(`Invalid file uploaded! Please check and try again!!`, 400);
 
-        const dest = `${ENV.FILE_UPLOAD_DIR}/output/${file.filename}`
-
-        const result = await new FFMPEGVideoConvertHandler().doJob({
-            data: {
-                src: file.path,
-                dest,
-                name: file.filename
-            },
-            meta: {}
+        const dest = `${ENV.FILE_UPLOAD_DIR}/output/${file.filename}`;
+        WorkerServ.addJob('480p_60fps_hlsh264', {
+            src: file.path,
+            dest: `${dest}_480p_60fps_hlsh264`,
+            name: file.filename
+        })
+        WorkerServ.addJob('480p_30fps_hlsh264', {
+            src: file.path,
+            dest: `${dest}_480p_30fps_hlsh264`,
+            name: file.filename
         })
 
         return file

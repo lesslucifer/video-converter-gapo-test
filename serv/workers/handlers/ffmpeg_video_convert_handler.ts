@@ -13,7 +13,15 @@ interface IFFMPEGVideoConverterData {
     name: string;
 }
 
+interface IFFMPEGCommandModifier {
+    (cmd: ffmpeg.FfmpegCommand): void
+}
+
 export class FFMPEGVideoConvertHandler implements IWorkerHandler {
+    constructor(
+        private modifier?: IFFMPEGCommandModifier
+    ) {}
+
     private dataAssertion = newAjv2()({
         '+@src': 'string',
         '+@dest': 'string',
@@ -34,10 +42,9 @@ export class FFMPEGVideoConvertHandler implements IWorkerHandler {
 
             await fs.mkdirp(data.dest);
             
-            const cmd = ffmpeg(data.src).outputFPS(60).size('640x?').aspect('4:3').videoCodec('libx264')
-            .outputOptions(['-crf 24', '-preset veryfast', '-scodec copy'])
-            .outputOptions(['-g 48', '-keyint_min 48', '-sc_threshold 0', '-hls_time 4', '-hls_playlist_type vod'])
-            .output(`${data.dest}/${data.name}.m3u8`);
+            const cmd = ffmpeg(data.src);
+            this.modifier && this.modifier(cmd);
+            cmd.output(`${data.dest}/${data.name}.m3u8`);
 
             await FFMPEGVideoConvertHandler.promisifyRunFFMPEGCommand(cmd);
         }
@@ -60,4 +67,16 @@ export class FFMPEGVideoConvertHandler implements IWorkerHandler {
             cmd.on('error', (...args) => !isTimedout && rej(...args)).on('end', (...args) => !isTimedout && res(...args)).run();
         })
     }
+}
+
+export function _480p_60fps_hlsh264Mod(cmd: ffmpeg.FfmpegCommand) {
+    cmd.outputFPS(60).size('640x?').aspect('4:3').videoCodec('libx264')
+    .outputOptions(['-crf 24', '-preset veryfast', '-scodec copy'])
+    .outputOptions(['-g 48', '-keyint_min 48', '-sc_threshold 0', '-hls_time 16', '-hls_playlist_type vod'])
+}
+
+export function _480p_30fps_hlsh264Mod(cmd: ffmpeg.FfmpegCommand) {
+    cmd.outputFPS(30).size('640x?').aspect('4:3').videoCodec('libx264')
+    .outputOptions(['-crf 24', '-preset veryfast', '-scodec copy'])
+    .outputOptions(['-g 48', '-keyint_min 48', '-sc_threshold 0', '-hls_time 16', '-hls_playlist_type vod'])
 }

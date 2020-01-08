@@ -8,12 +8,18 @@ import { ENV } from './glob/env';
 import { initModels } from './models/miscs';
 import hera, { AppLogicError, AppApiResponse } from './utils/hera';
 import { APIInfo, ExpressRouter } from 'express-router-ts'
+import WorkerServ from './serv/workers';
+import CONN from './glob/conn';
 
 // Import routers
 export class Program {
     static server: express.Express;
 
     public static async setUp() {
+        await CONN.configureConnections(ENV.CONN);
+    }
+
+    public static async startHttp() {
         const server = express();
         this.server = server;
         server.use(bodyParser.json());
@@ -43,14 +49,23 @@ export class Program {
         
         ExpressRouter.ResponseHandler = this.expressRouterResponse.bind(this)
         ExpressRouter.ErrorHandler = this.expressRouterError.bind(this)
-    }
-
-    public static async main() {
-        await this.setUp();
+        
         await new Promise(res => this.server.listen(ENV.HTTP_PORT, () => {
             console.log(`Listen on port ${ENV.HTTP_PORT}...`);
             res();
         }));
+    }
+
+    public static async main() {
+        await this.setUp();
+        if (ENV.PROCESS.worker == true) {
+            await WorkerServ.startWorkers();
+        }
+        
+
+        if (ENV.PROCESS.http == true) {
+            await this.startHttp();
+        }
         
         return 0;
     }

@@ -6,6 +6,9 @@
   </head>
   
   <body>
+    <input id="video_id" placeholder="Video id...">
+    <button id="load_video">Load Video</button>
+
     <video
       id="my-video"
       class="video-js"
@@ -15,7 +18,6 @@
       height="480"
       data-setup="{}"
     >
-      <source src="http://localhost:15834/hls/dadbbc32-816c-41ec-993f-60f507b7cb5b/dadbbc32-816c-41ec-993f-60f507b7cb5b.m3u8" type="application/x-mpegURL" />
       <p class="vjs-no-js">
         To view this video please enable JavaScript, and consider upgrading to a
         web browser that
@@ -29,6 +31,13 @@
     <script src="https://unpkg.com/@videojs/http-streaming@1.11.2/dist/videojs-http-streaming.min.js"></script>
 
     <script>
-        videojs('my-video');
+        var myPlayer = videojs('my-video');
+        document.getElementById('load_video').onclick = function (event) {
+          var videoId = document.getElementById('video_id').value;
+          var url = `http://localhost:15834/hls/${videoId}_480p_60fps_hlsh264/${videoId}.m3u8`
+
+          myPlayer.pause()
+          myPlayer.src({type: 'application/x-mpegURL', src: url});
+        }
     </script>
   </body>

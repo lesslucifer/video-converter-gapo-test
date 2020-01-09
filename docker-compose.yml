@@ -6,10 +6,9 @@ services:
       context: ./
       dockerfile: videoconverter.Dockerfile
     ports:
-      - "80:80"
+      - "8080:80"
     env_file:
       - ".env"
     volumes:
-      - "./data/db/redis:/var/lib/redis"
-      - ".:/var/www/server"
+      - "./data:/data"
     hostname: videoconverter.localhost.com

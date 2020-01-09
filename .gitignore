@@ -6,4 +6,5 @@ typings
 .nyc*
 coverage
 dist
-env*.json
+./env*.json
+/data/**/*

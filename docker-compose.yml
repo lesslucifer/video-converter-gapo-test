@@ -1,0 +1,15 @@
+version: "3"
+services:
+  web:
+    container_name: ${APP_NAME}web
+    build:
+      context: ./
+      dockerfile: videoconverter.Dockerfile
+    ports:
+      - "80:80"
+    env_file:
+      - ".env"
+    volumes:
+      - "./data/db/redis:/var/lib/redis"
+      - ".:/var/www/server"
+    hostname: videoconverter.localhost.com

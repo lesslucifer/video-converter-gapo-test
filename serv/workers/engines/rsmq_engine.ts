@@ -17,7 +17,7 @@ export class RSMQEngine implements IWorkerEngine {
             await this.rsmq.createQueueAsync(this.queueOpts);
         }
         catch (err) {
-            // ignore if the queue is exist
+            // ignore if the queue is alreadyd exist
         }
     }
 

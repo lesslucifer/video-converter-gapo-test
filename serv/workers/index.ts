@@ -23,9 +23,6 @@ export class WorkerServ {
     static addJob(type: string, data: any) {
         if (this.rsmq) {
             return this.rsmq.sendMessageAsync({qname: type, message: JSON.stringify(data)})
-        } else {
-            console.log('RabitMQ Channel not found. Cannot add job ', type, JSON.stringify(data));
-            throw new AppLogicError("RabitMQ Channel not found");
         }
     }
 

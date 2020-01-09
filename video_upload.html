@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<script src="https://unpkg.com/react@16/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@16/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/babel-standalone@6.15.0/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.24.0/moment.min.js"></script>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+  integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+
+<link href="https://vjs.zencdn.net/7.6.6/video-js.css" rel="stylesheet" />
+<script src="https://vjs.zencdn.net/ie8/1.1.2/videojs-ie8.min.js"></script>
+<script src="https://vjs.zencdn.net/7.6.6/video.js"></script>
+<script src="https://unpkg.com/@videojs/http-streaming@1.11.2/dist/videojs-http-streaming.min.js"></script>
+
+<body>
+
+  <div id="mydiv"></div>
+
+  <script type="text/babel">
+    class NavBar extends React.Component {
+      render() {
+        return (
+          <div class="navbar">
+            Video Converter
+        </div>
+        )
+      }
+    }
+
+    class App extends React.Component {
+      state = {}
+
+      componentDidMount() {
+        const fileSelector = document.createElement('input');
+        fileSelector.setAttribute('type', 'file');
+        fileSelector.setAttribute('accept', 'video/mp4,video/x-m4v,video/*');
+        fileSelector.onchange = this.onFileChange.bind(this)
+        this.fileSelector = fileSelector;
+
+        this.myPlayer = videojs('video-player');
+        this.reloadVideoList()
+      }
+
+      async reloadVideoList() {
+        const resp = await fetch('/videos');
+        const json = await resp.json();
+        const videos = (json && json['data']) || []
+
+        this.setState({ videos })
+      }
+
+      playVideoFile(video, file) {
+        this.myPlayer.pause()
+        this.myPlayer.src({ type: 'application/x-mpegURL', src: `/hls/${file.path}/${video.id}.m3u8` });
+        this.myPlayer.play()
+      }
+
+      async reloadVideo(id) {
+        const resp = await fetch(`/videos/${id}`);
+        const json = await resp.json();
+        const video = json && json['data']
+
+        this.setState({videos: this.state.videos.map(v => v.id == id ? video : v)})
+      }
+
+      handleFileSelect(e) {
+        e.preventDefault();
+        this.fileSelector.click();
+      }
+
+      async uploadFile(e) {
+        e.preventDefault();
+        if (!this.state.file) return;
+
+        const formData = new FormData();
+        formData.append('video', this.state.file)
+
+        const resp = await fetch(`/videos`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        alert('Tải file lên thành công');
+        this.setState({ file: null })
+        setTimeout(() => this.reloadVideoList())
+      }
+
+      onFileChange(e) {
+        const file = this.fileSelector.files.length > 0 ? this.fileSelector.files[0] : null
+        this.setState({ file })
+      }
+
+      render() {
+        return (<div id="main">
+          <NavBar></NavBar>
+          <div class="content">
+            <div id="file_upload">
+              <div class="select_file_box">
+                <h2 style={{ 'flex': '1 1 auto' }}> {this.state.file ? this.state.file.name : 'Chọn một file để tải lên'} </h2>
+                <a class="btn btn-primary" href="" onClick={this.handleFileSelect.bind(this)} style={{ 'flex': '0 0 auto' }}>Mở file...</a>
+              </div>
+              {this.state.file && (
+                <a class="btn btn-primary mt-1" href="" onClick={this.uploadFile.bind(this)}>Tải lên</a>
+              )}
+            </div>
+            <div class="player-container">
+              <video
+                id="video-player"
+                class="video-js"
+                controls
+                preload="auto"
+                width="640"
+                height="480"
+                data-setup="{}"
+              >
+                <p class="vjs-no-js">
+                  To view this video please enable JavaScript, and consider upgrading to a
+                  web browser that
+                    <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>
+                </p>
+              </video>
+            </div>
+            <div class="mt-5">
+              <table class="table table-striped">
+                <thead class="thead-dark">
+                  <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">ID</th>
+                    <th scope="col">Tên</th>
+                    <th scope="col">Tải lên</th>
+                    <th scope="col" style={{ 'width': '15%' }}>Files</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {this.state.videos && this.state.videos.map(this.renderVideos.bind(this))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>)
+      }
+
+      renderVideos(video, i) {
+        return (
+          <tr>
+            <th scope="row" class="item-center">{i + 1}</th>
+            <td class="item-center">{video.id} (<a href="" onClick={(e) => {e.preventDefault(); this.reloadVideo(video.id)}}>Reload</a>)</td>
+            <td class="item-center">{video.name}</td>
+            <td class="item-center">{video.created_at ? moment(video.created_at).format('DD-MM-YY HH:mm') : '-'}</td>
+            <td class="video-file item-center">{video.files.map(f => this.renderVideoFiles(video, f))}</td>
+          </tr>
+        )
+      }
+
+      renderVideoFiles(video, file) {
+        if (!file) return null
+
+        switch (file.status) {
+          case 'WAITING':
+            return <button class="btn btn-secondary m-1" disabled>{file.codecName} (Chờ xử lý)</button>
+          case 'CONVERTING':
+            return <button class="btn btn-secondary m-1" disabled>{file.codecName} (Đang xử lý)</button>
+          case 'COMPLETED':
+            return <button class="btn btn-primary m-1" onClick={(e) => {e.preventDefault(); this.playVideoFile(video, file)}}>{file.codecName}</button>
+        }
+
+        return null;
+      }
+    }
+
+    ReactDOM.render(<App />, document.getElementById('mydiv'))
+  </script>
+
+  <style>
+    #main {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .navbar {
+      display: flex;
+      flex-direction: row;
+      height: 50px;
+      background-color: #42a5f5;
+      color: white;
+      font-size: 24px;
+      font-weight: 400;
+      align-items: center;
+      padding-left: 15px;
+    }
+
+    .item-center {
+      align-items: center;
+      vertical-align: middle !important;
+    }
+
+    .content {
+      margin: 40px 20px 0 20px;
+    }
+
+    .select_file_box {
+      display: flex;
+      flex-direction: row;
+      background-color: #e3f2fd;
+      padding: 10px;
+    }
+
+    .video-file {
+      display: flex;
+      flex-flow: column wrap;
+      justify-content: space-around;
+    }
+
+    .player-container {
+      margin-top: 15px;
+      display: flex;
+      justify-content: center;
+    }
+  </style>
+</body>
+
+</html>

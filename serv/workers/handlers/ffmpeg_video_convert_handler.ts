@@ -6,11 +6,14 @@ import ENV from "../../../glob/env";
 import newAjv2 from "../../../utils/ajv2";
 import ffmpeg from 'fluent-ffmpeg';
 import * as fs from 'fs-extra';
+import Video from "../../../models/video";
 
 interface IFFMPEGVideoConverterData {
+    id: string;
     src: string;
     dest: string;
     name: string;
+    codec: string;
 }
 
 interface IFFMPEGCommandModifier {
@@ -23,9 +26,11 @@ export class FFMPEGVideoConvertHandler implements IWorkerHandler {
     ) {}
 
     private dataAssertion = newAjv2()({
+        '+@id': 'string',
         '+@src': 'string',
         '+@dest': 'string',
-        '+@name': 'string'
+        '+@name': 'string',
+        '+@codec': 'string'
     })
 
     async init() { }
@@ -40,6 +45,13 @@ export class FFMPEGVideoConvertHandler implements IWorkerHandler {
         try {
             const data = this.assertData(job.data);
 
+            await Video.updateVideo({
+                id: data.name,
+                files: [
+                    <any> {codecName: data.codec, status: 'CONVERTING'}
+                ]
+            })
+
             await fs.mkdirp(data.dest);
             
             const cmd = ffmpeg(data.src);
@@ -47,6 +59,13 @@ export class FFMPEGVideoConvertHandler implements IWorkerHandler {
             cmd.output(`${data.dest}/${data.name}.m3u8`);
 
             await FFMPEGVideoConvertHandler.promisifyRunFFMPEGCommand(cmd);
+
+            await Video.updateVideo({
+                id: data.name,
+                files: [
+                    <any> {codecName: data.codec, status: 'COMPLETED'}
+                ]
+            })
         }
         catch (err) {
             // TODO: need to have a way to trace back, not just log

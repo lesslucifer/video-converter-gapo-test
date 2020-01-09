@@ -267,3 +267,67 @@ Trong thực tế việc serving HLS file mình nhường lại cho các bạn S
 Ở đây để trình bày ý tưởng thì mình dùng express static. Đơn giản nhưng đủ hiệu quả với bài test.
 
 Ở frontend thì mình dùng thư viện common nhất là [video.js](https://videojs.com/), btw.
+
+## Tối ưu hóa computing resource
+Trước hết, để tối ưu hóa cho việc convert video thì mình nghĩ kiến thức về xử lý video là không thể thiếu, hay cụ thể hơn là cấu hình câu lệnh ffmpeg như thế nào để việc convert được hiệu quả và tiết kiệm nhất. Mình nói thật là chưa có nhiều kinh nghiệm lắm về mảng này nên xin tạm không đào sâu. Chỉ xin xác định rằng research về video processing là quan trọng và cần thiết.
+
+Thay vào đó, mình xin trình bày ý tưởng tổng quát hơn về hệ thống. Hiện tại, ý tưởng cơ bản về hệ thống convert của mình có thể trình bày như sau:
+
+![enter image description here](https://i.imgur.com/OR1CGRK.png)
+
+Video sau khi được upload lên server thì sẽ được tạo các job tương ứng với việc convert, đưa vào các hàng đợi, và sẽ được xử lý bởi các worker tương ứng. Việc tăng khả năng xử lý của hệ thống, trước hết, có thể được xử lý bằng việc tăng số lượng worker, tư tưởng này khá cơ bắp và có lẽ chưa thực sự tối ưu (~~nhưng ít nhất nó chạy được~~)
+
+1. Ý tưởng đầu tiên để tối ưu của mình đến từ quy trình convert video của FFMPEG:
+```
+ _______              ______________
+|       |            |              |
+| input |  demuxer   | encoded data |   decoder
+| file  | ---------> | packets      | -----+
+|_______|            |______________|      |
+                                           v
+                                       _________
+                                      |         |
+                                      | decoded |
+                                      | frames  |
+                                      |_________|
+ ________             ______________       |
+|        |           |              |      |
+| output | <-------- | encoded data | <----+
+| file   |   muxer   | packets      |   encoder
+|________|           |______________|
+```
+
+Với thiết kế như trên, việc demux demux & decode sẽ bị thực hiện lặp lại cho mỗi định dạng khác nhau. Để tránh việc này, ta cần thêm một bước trung gian để đưa từ input file thành data raw trước khi encode:
+
+![enter image description here](https://i.imgur.com/1C4RW17.png)
+
+**Note**: bên trên vẽ gom lại chỉ có một encode queue, nhưng cần hiểu là có nhiều queue cho mỗi định dạng đầu ra. Suy diễn tương tự, mỗi định dạng đầu vào cũng sẽ cần cấu hình khác nhau cho tối ưu, nên cũng sẽ cần nhiều decode queue với mỗi định dạng đầu vào.
+
+2. Tùy biến bước filter cho từng video:
+Việc filter video không chỉ phụ thuộc vào định dạng mà còn phụ thuộc (phần lớn) và bản thân nội dung của video. Cấu hình hiệu quả để convert một video rapid moving (bóng đá, phim, hoạt họa) hoàn toàn khác với một video âm nhạc (tĩnh). Hoặc khác nhau giữa một video dài và một video ngắn. Hoặc một video (gốc) chất lượng cao và chất lượng thấp.
+
+Từ đó dẫn đến việc phân phối xử lý các video ở bước filter cũng là một bài toán cần quan tâm. Đơn cử như các video có tính chất giống nhau, nên được gom chung lại nhằm xử lý bằng một bộ config tối ưu hơn:
+![enter image description here](https://i.imgur.com/TcndxUY.png)
+
+Tương tự, filter engine sẽ xác định video sẽ được xử lý bằng cấu hình nào là tối ưu, và đưa vào queue tương ứng. Việc tiêu chí để đánh giá có lẽ cần nghiên cứu chi tiết hơn nữa, mình xin đề xuất vài hướng dễ thấy:
+- Bản thân nội dung của video về hình ảnh (tĩnh hay động, mức độ thay đổi hình ảnh) và âm thanh
+- Thời lượng (cũng có thể cắt video ra thành nhiều chunk nhỏ để xử lý - cũng không chắc sẽ tối ưu hơn)
+- Chất lượng của file gốc (việc convert video thành các định dạng có chất lượng cao hơn khá vô nghĩa)
+- Nhu cầu cụ thể của user
+
+3. Tiền xử lý ở client:
+Thiết bị cá nhân hiện tại của người dùng hiện nay cũng rất mạnh và có thể xem xét tiền xử lý video trước ở client trước khi gửi lên server.
+
+4. Cơ sở hạ tầng
+Bên trên mình chỉ tập trung vào ý tưởng xử lý, nhưng việc xây dựng cơ sở hạ tầng về phần cứng cũng có ảnh hưởng rất lớn đến hiệu năng và không thể bỏ qua. Mình nghĩ việc này nên để lại cho các bạn thiên về System hơn, nên chỉ đề xuất vài gạch đầu dòng cần chú ý:
+- Video sau khi upload lên cần được lưu trữ (hoặc đưa về) gần với worker xử lý tương ứng
+- Tương tự, output của các giai đoạn cũng cần được lưu trữ sao cho bước xử lý tiếp theo được thực hiện dễ dàng & tối ưu nhất. Giảm chi phí transfer & bandwidth.
+- Phân phối kết quả đầu ra cũng cần quan tâm.
+- Nếu một queue quá lớn cũng cần tính đến các phương án load balancing
+- Việc điều chỉnh số lượng queue / worker có thể rất khác nhau giữa các bước hoặc các định dạng, hoặc thời điểm. Nên cần xây dựng sao cho dễ điều chỉnh tăng / giảm nhất.
+- Cuối cùng, việc convert video suy cho cùng là đánh đổi sức mạnh phần cứng, nên hạ tầng phần cứng phải đủ vững chắc.
+
+## Tối ưu hóa trải nghiệm người dùng
+Ở đây mình xin copy cách youtube xử lý. Khi người dùng upload một video lên, youtube sẽ cố gắng tạo ra một video theo format chuẩn nhanh nhất có thể mà tạm bỏ qua các tiêu chí về hiệu quả hạ tầng hay chất lượng.
+Tương tự thế, ở đây chúng ta có thể làm riêng một queue (và cụm worker) chuyên xử lý fast converting video về một định dạng chất lượng thấp để chuyển sang bước deliver nhanh nhất. Các format chất lượng cao sẽ được xử lý background và cập nhật tự động sau.
+Bên cạnh đó, việc tiền xử lý video ở client cũng có thể xem xét (Ví dụ: video dưới 15s có thể tiến hành convert nhanh ở client rồi upload lên server, server có thể sử dụng trực tiếp)

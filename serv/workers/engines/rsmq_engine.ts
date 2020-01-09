@@ -4,7 +4,7 @@ import hera from "../../../utils/hera";
 import { isEmpty } from "lodash";
 
 export class RSMQEngine implements IWorkerEngine {
-    private consumeTimer: NodeJS.Timeout;
+    private isConsuming = false;
 
     constructor(
         private rsmq: RedisSMQ,
@@ -22,19 +22,22 @@ export class RSMQEngine implements IWorkerEngine {
     }
 
     async consume(consumer: IWorkerEngineConsumer): Promise<any> {
-        this.consumeTimer = setInterval(async () => {
+        this.isConsuming = true;
+        while (this.isConsuming) {
             while (true) {
                 const msg = await this.rsmq.receiveMessageAsync({ qname: this.queueOpts.qname }) as RedisSMQ.QueueMessage;
                 if (isEmpty(msg)) break;
                 
-                consumer({
+                await consumer({
                     data: JSON.parse(msg.message),
                     meta: {
                         msg: msg
                     }
                 });
             }
-        }, this.fetchInterval)
+
+            await new Promise(res => setTimeout(res, this.fetchInterval));
+        }
     }
 
     async ack(job: IWorkerJob): Promise<any> {

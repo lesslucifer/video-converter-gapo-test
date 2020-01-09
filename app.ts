@@ -5,7 +5,6 @@ import _ from 'lodash';
 import moment from 'moment';
 import * as path from 'path';
 import { ENV } from './glob/env';
-import { initModels } from './models/miscs';
 import hera, { AppLogicError, AppApiResponse } from './utils/hera';
 import { APIInfo, ExpressRouter } from 'express-router-ts'
 import WorkerServ from './serv/workers';

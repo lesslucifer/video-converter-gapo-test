@@ -24,8 +24,8 @@
   "dependencies": {
     "ajv": "^6.10.2",
     "amqplib": "^0.5.5",
-    "body-parser": "^1.18.2",
-    "express": "^4.16.3",
+    "body-parser": "^1.20.1",
+    "express": "^4.18.2",
     "express-router-ts": "0.0.15",
     "fluent-ffmpeg": "^2.1.2",
     "fs-extra": "^7.0.0",
